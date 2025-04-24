@@ -1,173 +1,195 @@
-#include<iostream>
-#include<omp.h>
-#include<bits/stdc++.h>
+#include <iostream>
+#include <vector>
+#include <queue>
+#include <stack>
+#include <omp.h>
+#include <chrono>
+#include <cstdlib>
 
 using namespace std;
+using namespace std::chrono;
 
+class Graph {
+public:
+    int V;
+    vector<vector<int>> adj;
 
-class Graph{
-    public:
-        // vector<vector<int>> graph;
-        // vector<bool> visited;
-        // int vertices = 0;
-        // int edges = 0;
+    Graph(int V) {
+        this->V = V;
+        adj.resize(V);
+    }
 
-        int vertices = 6;
-        int edges = 5;
-        vector<vector<int>> graph = {{1},{0,2,3},{1,4,5},{1,4},{2,3},{2}};
-        vector<bool> visited;
+    void addEdge(int u, int v) {
+        adj[u].push_back(v);
+        adj[v].push_back(u);
+    }
 
-        // Graph(){
-        //     cout << "Enter number of nodes: ";
-        //     cin >> vertices;
-        //     cout << "Enter number of edges: ";
-        //     cin >> edges;
-        //     graph.assign(vertices,vector<int>());
-        //     for(int i = 0 ; i < edges;i++){
-        //         int a,b;
-        //         cout << "Enter adjacent nodes: ";
-        //         cin >> a >> b;
-        //         addEdge(a,b);
-        //     }
-        // }
-        void addEdge(int a, int b){
-            graph[a].push_back(b);
-            graph[b].push_back(a);
-        }
-
-        void printGraph(){
-            for(int i = 0; i < vertices; i++){
-                cout << i << " -> ";
-                for(auto j = graph[i].begin(); j != graph[i].end();j++){
-                    cout << *j << " ";
-                }
-                cout << endl;
-            }
-        }
-
-        void initialize_visited(){
-            visited.assign(vertices,false);
-        }
-
-        void dfs(int i){
-            stack<int> s;
-            s.push(i);
-            visited[i] = true;
-
-            while(s.empty() != true){
-                int current = s.top();
-                cout << current << " ";
-                s.pop();
-                for(auto j = graph[current].begin(); j != graph[current].end();j++){
-                    if(visited[*j] == false){
-                        s.push(*j);
-                        visited[*j] = true;
-                    }
-                }
-                
-            }
-        }
-
-        void parallel_dfs(int i){
-            stack<int> s;
-            s.push(i);
-            visited[i] = true;
-
-            while(s.empty() != true){
-                int current = s.top();
-                cout << current << " ";
-                #pragma omp critical
-                    s.pop();
-                #pragma omp parallel for
-                    for(auto j = graph[current].begin(); j != graph[current].end();j++){
-                        if(visited[*j] == false){
-                            #pragma omp critical
-                            {
-                                s.push(*j);
-                                visited[*j] = true;
-                            }
-                        }
-                    }
-                
-            }
-        }
-
-        void bfs(int i){
-            queue<int> q;
-            q.push(i);
-            visited[i] = true;
-
-            while(q.empty() != true){
-                int current = q.front();
-                q.pop();
-                cout << current << " ";
-                for(auto j = graph[current].begin(); j != graph[current].end();j++){
-                    if(visited[*j] == false){
-                        q.push(*j);
-                        visited[*j] = true;
-                    }
-                }
-            }
-        }
-
-        void parallel_bfs(int i){
-            queue<int> q;
-            q.push(i);
-            visited[i] = true;
-
-            while(q.empty() != true){
-                
-                    int current = q.front();
-                    cout << current << " ";
-                    #pragma omp critical
-                        q.pop();
-                    
-                #pragma omp parallel for
-                    for(auto j = graph[current].begin(); j != graph[current].end();j++){
-                        if(visited[*j] == false){
-                            #pragma omp critical
-                                q.push(*j);
-                                visited[*j] = true;
-                        }
-                    }
-                
-            }
-        }
+    void generateRandomGraph(int edges);
+    void sequentialBFS(int start);
+    void parallelBFS(int start);
+    void sequentialDFS(int start);
+    void parallelDFS(int start);
 };
 
-int main(int argc, char const *argv[])
-{
-    Graph g;
-    cout << "Adjacency List:\n";
-    g.printGraph();
-    g.initialize_visited();
-    cout << "Depth First Search: \n";
-    auto start = chrono::high_resolution_clock::now();
-    g.dfs(0);
-    cout << endl;
-    auto end = chrono::high_resolution_clock::now();
-    cout << "Time taken: " << chrono::duration_cast<chrono::microseconds>(end - start).count() << " microseconds" << endl;
-    cout << "Parallel Depth First Search: \n";
-    g.initialize_visited();
-    start = chrono::high_resolution_clock::now();
-    g.parallel_dfs(0);
-    cout << endl;
-    end = chrono::high_resolution_clock::now();
-    cout << "Time taken: "<< chrono::duration_cast<chrono::microseconds>(end - start).count() << " microseconds" << endl;
-    start = chrono::high_resolution_clock::now();
-    cout << "Breadth First Search: \n";
-    g.initialize_visited();
-    g.bfs(0);
-    cout << endl;
-    end = chrono::high_resolution_clock::now();
-    cout << "Time taken: "<< chrono::duration_cast<chrono::microseconds>(end - start).count() << " microseconds" << endl;
-    start = chrono::high_resolution_clock::now();
-    cout << "Parallel Breadth First Search: \n";
-    g.initialize_visited();
-    g.parallel_bfs(0);
-    cout << endl;
-    end = chrono::high_resolution_clock::now();
-    cout << "Time taken: " << chrono::duration_cast<chrono::microseconds>(end - start).count() << " microseconds" << endl;
+void Graph::generateRandomGraph(int edges) {
+    srand(time(0));
+    for (int i = 0; i < edges; i++) {
+        int u = rand() % V;
+        int v = rand() % V;
+        if (u != v) {
+            addEdge(u, v);
+        }
+    }
+}
+
+void Graph::sequentialBFS(int start) {
+    vector<bool> visited(V, false);
+    queue<int> q;
+    visited[start] = true;
+    q.push(start);
+
+    while (!q.empty()) {
+        int node = q.front();
+        q.pop();
+
+        for (int neighbor : adj[node]) {
+            if (!visited[neighbor]) {
+                visited[neighbor] = true;
+                q.push(neighbor);
+            }
+        }
+    }
+}
+
+void Graph::parallelBFS(int start) {
+    vector<bool> visited(V, false);
+    queue<int> q;
+    visited[start] = true;
+    q.push(start);
+
+    while (!q.empty()) {
+        int size = q.size();
+        vector<int> levelNodes;
+        
+        #pragma omp parallel for shared(visited, q) 
+        for (int i = 0; i < size; i++) {
+            int node;
+            #pragma omp critical
+            {
+                if (!q.empty()) {
+                    node = q.front();
+                    q.pop();
+                }
+            }
+            for (int neighbor : adj[node]) {
+                if (!visited[neighbor]) {
+                    visited[neighbor] = true;
+                    #pragma omp critical
+                    levelNodes.push_back(neighbor);
+                }
+            }
+        }
+        
+        for (int node : levelNodes) {
+            q.push(node);
+        }
+    }
+}
+
+void Graph::sequentialDFS(int start) {
+    vector<bool> visited(V, false);
+    stack<int> s;
+    s.push(start);
+
+    while (!s.empty()) {
+        int node = s.top();
+        s.pop();
+        if (!visited[node]) {
+            visited[node] = true;
+            for (int neighbor : adj[node]) {
+                if (!visited[neighbor]) {
+                    s.push(neighbor);
+                }
+            }
+        }
+    }
+}
+
+void Graph::parallelDFS(int start) {
+    vector<bool> visited(V, false);
+    stack<int> s;
+    s.push(start);
+
+    #pragma omp parallel
+    {
+        while (!s.empty()) {
+            int node;
+            #pragma omp critical
+            {
+                if (!s.empty()) {
+                    node = s.top();
+                    s.pop();
+                }
+            }
+            if (!visited[node]) {
+                visited[node] = true;
+                #pragma omp parallel for
+                for (int i = 0; i < adj[node].size(); i++) {
+                    int neighbor = adj[node][i];
+                    if (!visited[neighbor]) {
+                        #pragma omp critical
+                        s.push(neighbor);
+                    }
+                }
+            }
+        }
+    }
+}
+
+int main() {
+    int V, E;
+    
+    cout << "Enter the number of vertices: ";
+    cin >> V;
+    
+    cout << "Enter the number of edges: ";
+    cin >> E;
+
+    if (E > (V * (V - 1)) / 2) {
+        cout << "Too many edges for the given number of vertices. Adjusting to maximum possible edges.\n";
+        E = (V * (V - 1)) / 2;
+    }
+
+    Graph g(V);
+    g.generateRandomGraph(E);
+
+    auto start = high_resolution_clock::now();
+    g.sequentialBFS(0);
+    auto stop = high_resolution_clock::now();
+    auto seqBFS_time = duration_cast<microseconds>(stop - start);
+
+    start = high_resolution_clock::now();
+    g.parallelBFS(0);
+    stop = high_resolution_clock::now();
+    auto parBFS_time = duration_cast<microseconds>(stop - start);
+
+    start = high_resolution_clock::now();
+    g.sequentialDFS(0);
+    stop = high_resolution_clock::now();
+    auto seqDFS_time = duration_cast<microseconds>(stop - start);
+
+    start = high_resolution_clock::now();
+    g.parallelDFS(0);
+    stop = high_resolution_clock::now();
+    auto parDFS_time = duration_cast<microseconds>(stop - start);
+
+    cout << "Sequential BFS Time: " << seqBFS_time.count() << " microseconds" << endl;
+    cout << "Parallel BFS Time: " << parBFS_time.count() << " microseconds" << endl;
+    cout << "Speedup for BFS: " << (double)seqBFS_time.count() / parBFS_time.count() << endl;
+
+    cout << "Sequential DFS Time: " << seqDFS_time.count() << " microseconds" << endl;
+    cout << "Parallel DFS Time: " << parDFS_time.count() << " microseconds" << endl;
+    cout << "Speedup for DFS: " << (double)seqDFS_time.count() / parDFS_time.count() << endl;
 
     return 0;
 }
